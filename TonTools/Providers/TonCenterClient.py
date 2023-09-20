@@ -297,7 +297,7 @@ class TonCenterClient:
                 'boc': boc
             }
             response = await session.post(url=url, json=data, headers=self.headers)
-            return response.status
+            return response
 
     async def get_wallet_seqno(self, address: str):
         data = await self.run_get_method(address=address, method='seqno', stack=[])
