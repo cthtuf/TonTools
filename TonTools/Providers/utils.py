@@ -11,6 +11,8 @@ from ton.account import Account
 from ton import TonlibClient
 from ton.utils.cell import read_address
 
+logger = logging.getLogger(__name__)
+
 
 def is_hex(str):
     try:
@@ -26,18 +28,42 @@ def process_jetton_data(data):
         return url
     else:
         symbol = Cell.one_from_boc(b64decode(data)).refs[0].refs[1].refs[0].refs[1].refs[0].bits.get_top_upped_array().decode().split('\x00')[-1]
-        desc1 = unicodedata.normalize("NFKD", Cell.one_from_boc(b64decode(data)).refs[0].refs[1].refs[1].refs[0].refs[0].bits.get_top_upped_array().decode().split('\x00')[-1])  # Cell.one_from_boc(b64decode(data)).refs[0].refs[1].refs[1].refs[0].refs
-        desc2 = unicodedata.normalize("NFKD", Cell.one_from_boc(b64decode(data)).refs[0].refs[1].refs[1].refs[0].refs[0].refs[0].bits.get_top_upped_array().decode().split('\x00')[-1]) if len(Cell.one_from_boc(b64decode(data)).refs[0].refs[1].refs[1].refs[0].refs[0].refs) else ''
-        decimals = Cell.one_from_boc(b64decode(data)).refs[0].refs[1].refs[1].refs[1].refs[0].bits.get_top_upped_array().decode().split('\x00')[-1]
-        name = Cell.one_from_boc(b64decode(data)).refs[0].refs[1].refs[0].refs[0].refs[0].bits.get_top_upped_array().decode().split('\x00')[-1]
-        image = Cell.one_from_boc(b64decode(data)).refs[0].refs[0].refs[0].bits.get_top_upped_array().decode().split('\x00')[-1]
-        return {
+        try:
+            desc1 = unicodedata.normalize("NFKD", Cell.one_from_boc(b64decode(data)).refs[0].refs[1].refs[1].refs[0].refs[0].bits.get_top_upped_array().decode().split('\x00')[-1])  # Cell.one_from_boc(b64decode(data)).refs[0].refs[1].refs[1].refs[0].refs
+        except (IndexError, TypeError, AttributeError):
+            logger.warning("Unable to get desc1 from jetton. Set empty value")
+            desc1 = ''
+        try:
+            desc2 = unicodedata.normalize("NFKD", Cell.one_from_boc(b64decode(data)).refs[0].refs[1].refs[1].refs[0].refs[0].refs[0].bits.get_top_upped_array().decode().split('\x00')[-1]) if len(Cell.one_from_boc(b64decode(data)).refs[0].refs[1].refs[1].refs[0].refs[0].refs) else ''
+        except (IndexError, TypeError, AttributeError):
+            logger.warning("Unable to get desc2 from jetton. Set empty value")
+            desc2 = ''
+        try:
+            decimals = int(Cell.one_from_boc(b64decode(data)).refs[0].refs[1].refs[1].refs[1].refs[0].bits.get_top_upped_array().decode().split('\x00')[-1])
+        except (IndexError, TypeError, AttributeError):
+            logger.warning("Unable to get decimals from jetton. Set empty value")
+            decimals = None
+        try:
+            name = Cell.one_from_boc(b64decode(data)).refs[0].refs[1].refs[0].refs[0].refs[0].bits.get_top_upped_array().decode().split('\x00')[-1]
+        except (IndexError, TypeError, AttributeError):
+            logger.warning("Unable to get name from jetton. Set empty value")
+            name = ''
+        try:
+            image = Cell.one_from_boc(b64decode(data)).refs[0].refs[0].refs[0].bits.get_top_upped_array().decode().split('\x00')[-1]
+        except (IndexError, TypeError, AttributeError):
+            logger.warning("Unable to get image from jetton. Set empty value")
+            image = ''
+        data = {
             'name': name,
-            'description': desc1 + desc2,
             'image': image,
             'symbol': symbol,
-            'decimals': int(decimals)
         }
+        if any((desc1, desc2)):
+            data['description'] = desc1 + desc2
+        if decimals is not None:
+            data['decimals'] = decimals
+
+        return data
 
 
 async def get(url: str):
